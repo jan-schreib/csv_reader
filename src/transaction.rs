@@ -74,16 +74,16 @@ impl Transaction {
         self.amount.unwrap_or_else(|| dec!(0.0))
     }
 
-    // Helper function to find the corresponding unlocked client to a transaction.
+    /// Helper function to find the corresponding unlocked client to a transaction.
     fn find_client<'a>(&self, clients: &'a mut Vec<Client>) -> Option<&'a mut Client> {
         clients
             .iter_mut()
             .find(|x| x.client_id == self.client_id && !x.locked)
     }
 
-    // This is the only function that is allowed to create users.
-    // When there is a "deposit" transaction and the user is not found, the user will be created.
-    // If the user is found and is unlocked, the funds will be added.
+    /// This is the only function that is allowed to create users.
+    /// When there is a "deposit" transaction and the user is not found, the user will be created.
+    /// If the user is found and is unlocked, the funds will be added.
     fn deposit(&self, clients: &mut Vec<Client>) {
         match clients.iter_mut().find(|x| x.client_id == self.client_id) {
             Some(c) => {
@@ -104,8 +104,8 @@ impl Transaction {
         }
     }
 
-    // Handles withdrawals if and only if the user exists and the money in the account is more or equal to the
-    // amount of the withdrawal. No margin allowed.
+    /// Handles withdrawals if and only if the user exists and the money in the account is more or equal to the
+    /// amount of the withdrawal. No margin allowed.
     fn withdrawal(&self, clients: &mut Vec<Client>) {
         if let Some(c) = self.find_client(clients) {
             if c.available_funds >= self.amount() && c.total_funds >= self.amount() {
@@ -116,10 +116,10 @@ impl Transaction {
         }
     }
 
-    // The clients way to claim that an transaction was errorneous.
-    // Disputed transactions will be handled via resolving the issue or a chargeback by the client.
-    // Funds of the transaction in question will be held (held_funds) and are not available to the client
-    // until the situation is resolved. This function also marks the transaction in question as disputed.
+    /// The clients way to claim that an transaction was errorneous.
+    /// Disputed transactions will be handled via resolving the issue or a chargeback by the client.
+    /// Funds of the transaction in question will be held (held_funds) and are not available to the client
+    /// until the situation is resolved. This function also marks the transaction in question as disputed.
     fn dispute(&self, clients: &mut Vec<Client>) {
         if let Some(client) = self.find_client(clients) {
             if let Some(t) = client
@@ -136,8 +136,8 @@ impl Transaction {
         }
     }
 
-    // A disputed transaction gets resolved and the held funds will be given back and are again usable
-    // for the client. If the transaction is not marked as disputed, the function call will be ignored.
+    /// A disputed transaction gets resolved and the held funds will be given back and are again usable
+    /// for the client. If the transaction is not marked as disputed, the function call will be ignored.
     fn resolve(&self, clients: &mut Vec<Client>) {
         if let Some(client) = self.find_client(clients) {
             if let Some(t) = client
@@ -157,12 +157,12 @@ impl Transaction {
         }
     }
 
-    // Client reverses a transaction. This will immediately freeze (lock) the client.
-    // A locked client can not do any more transactions.
-    // The held funds and total funds will be reduced by the disputed amount.
-    // If the disputed transaction was a withdrawal, the funds will be added to the account
-    // for any other transaction type the held funds and total funds will be reduced.
-    // If the transaction is not marked as disputed, the function call will be ignored.
+    /// Client reverses a transaction. This will immediately freeze (lock) the client.
+    /// A locked client can not do any more transactions.
+    /// The held funds and total funds will be reduced by the disputed amount.
+    /// If the disputed transaction was a withdrawal, the funds will be re-added to the account
+    /// for any other transaction type the held funds and total funds will be reduced.
+    /// If the transaction is not marked as disputed, the function call will be ignored.
     fn chargeback(&self, clients: &mut Vec<Client>) {
         if let Some(client) = self.find_client(clients) {
             if let Some(t) = client
