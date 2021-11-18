@@ -14,4 +14,8 @@ Assumptions that where made:
 2. Transactions on locked accounts have no effect and will be ignored. 
 
 For handling monetary values the rust_decimal crate is used. The decision was based on the fact that f64 can have round-off errors and the crate enables
-integral and fractional calculations. 
+integral and fractional calculations.
+I did not use clap for the command line args and usage, because there is only a single way to use this program.
+Since its guaranteed that the client ids and transaction ids are globall unique (but not ordered) there is no need to handle possible duplicates in the code.
+If the csv file is invalid or a transaction is of a unknown type the error is reported. Valid transactions will still be handled.
+
