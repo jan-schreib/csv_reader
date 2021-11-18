@@ -13,7 +13,7 @@ Assumptions that where made:
 
 2. Transactions on locked accounts have no effect and will be ignored.
 
-3. A chargeback of a withdrawal will actually increase the funds that where in question. E.g a faulty withdrawal of funds from the clients account.
+3. A chargeback of a withdrawal will actually redeposit funds. E.g a faulty withdrawal of funds from the clients account.
 
 For handling monetary values the rust_decimal crate is used. The decision was based on the fact that f64 can have round-off errors and the crate enables
 integral and fractional calculations.
