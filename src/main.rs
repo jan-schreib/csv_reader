@@ -1,5 +1,8 @@
+use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize, Serializer};
 use std::error::Error;
+use std::fmt::Debug;
 use std::{env, process};
 
 #[derive(Deserialize, Debug, Clone)]
@@ -10,14 +13,14 @@ struct Transaction {
     client_id: u16,
     #[serde(rename(deserialize = "tx"))]
     tx_id: u32,
-    amount: Option<f64>,
+    amount: Option<Decimal>,
     #[serde(skip_deserializing)]
     disputed: bool,
 }
 
 impl Transaction {
-    fn amount(&self) -> f64 {
-        self.amount.unwrap_or(0.0)
+    fn amount(&self) -> Decimal {
+        self.amount.unwrap_or(dec!(0.0))
     }
 }
 
@@ -27,20 +30,20 @@ struct Client {
     client_id: u16,
     #[serde(rename(serialize = "available"))]
     #[serde(serialize_with = "float_precission")]
-    available_funds: f64,
+    available_funds: Decimal,
     #[serde(rename(serialize = "held"))]
     #[serde(serialize_with = "float_precission")]
-    held_funds: f64,
+    held_funds: Decimal,
     #[serde(rename(serialize = "total"))]
     #[serde(serialize_with = "float_precission")]
-    total_funds: f64,
+    total_funds: Decimal,
     #[serde(rename(serialize = "locked"))]
     locked: bool,
     #[serde(skip_serializing)]
     transactions: Vec<Transaction>,
 }
 
-fn float_precission<S>(x: &f64, s: S) -> Result<S::Ok, S::Error>
+fn float_precission<S>(x: &Decimal, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -66,7 +69,7 @@ fn read_input_file(path: &str) -> Result<Vec<Transaction>, Box<dyn Error>> {
 
 fn deposit(clients: &mut Vec<Client>, transaction: &Transaction) {
     match find_client(clients, transaction) {
-        Some(mut c) => {
+        Some(c) => {
             c.available_funds += transaction.amount();
             c.total_funds += transaction.amount();
             c.transactions.push(transaction.clone());
@@ -74,7 +77,7 @@ fn deposit(clients: &mut Vec<Client>, transaction: &Transaction) {
         None => clients.push(Client {
             client_id: transaction.client_id,
             available_funds: transaction.amount(),
-            held_funds: 0.0,
+            held_funds: Decimal::new(0, 0),
             total_funds: transaction.amount(),
             locked: false,
             transactions: vec![transaction.clone()],
@@ -92,7 +95,7 @@ fn find_client<'a>(
 }
 
 fn withdrawal(clients: &mut Vec<Client>, transaction: &Transaction) {
-    if let Some(mut c) = find_client(clients, transaction) {
+    if let Some(c) = find_client(clients, transaction) {
         if c.available_funds >= transaction.amount() && c.total_funds >= transaction.amount() {
             c.available_funds -= transaction.amount();
             c.total_funds -= transaction.amount();
@@ -217,18 +220,18 @@ fn test_deposit() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(1.0),
+        amount: Some(dec!(1.0)),
         disputed: false,
     };
 
     deposit(&mut clients, &tx);
 
-    assert_eq!(1.0, clients.first().unwrap().available_funds);
-    assert_eq!(1.0, clients.first().unwrap().total_funds);
+    assert_eq!(dec!(1.0), clients.first().unwrap().available_funds);
+    assert_eq!(dec!(1.0), clients.first().unwrap().total_funds);
 
     deposit(&mut clients, &tx);
-    assert_eq!(2.0, clients.first().unwrap().available_funds);
-    assert_eq!(2.0, clients.first().unwrap().total_funds);
+    assert_eq!(dec!(2.0), clients.first().unwrap().available_funds);
+    assert_eq!(dec!(2.0), clients.first().unwrap().total_funds);
     assert_eq!(1, clients.len())
 }
 
@@ -239,7 +242,7 @@ fn test_withdrawal() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(1.0),
+        amount: Some(dec!(1.0)),
         disputed: false,
     };
 
@@ -247,7 +250,7 @@ fn test_withdrawal() {
         tx_type: "withdrawal".to_string(),
         client_id: 1,
         tx_id: 2,
-        amount: Some(0.5),
+        amount: Some(dec!(0.5)),
         disputed: false,
     };
 
@@ -259,16 +262,16 @@ fn test_withdrawal() {
     deposit(&mut clients, &tx_d);
     withdrawal(&mut clients, &tx_w);
 
-    assert_eq!(0.5, clients.first().unwrap().available_funds);
-    assert_eq!(0.5, clients.first().unwrap().total_funds);
+    assert_eq!(dec!(0.5), clients.first().unwrap().available_funds);
+    assert_eq!(dec!(0.5), clients.first().unwrap().total_funds);
 
     //withdraw more money than the account has
-    tx_w.amount = Some(5.0);
+    tx_w.amount = Some(dec!(5.0));
 
     withdrawal(&mut clients, &tx_w);
 
-    assert_eq!(0.5, clients.first().unwrap().available_funds);
-    assert_eq!(0.5, clients.first().unwrap().total_funds)
+    assert_eq!(dec!(0.5), clients.first().unwrap().available_funds);
+    assert_eq!(dec!(0.5), clients.first().unwrap().total_funds)
 }
 
 #[test]
@@ -278,7 +281,7 @@ fn test_withdrawal_resolve() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -286,7 +289,7 @@ fn test_withdrawal_resolve() {
         tx_type: "withdrawal".to_string(),
         client_id: 1,
         tx_id: 2,
-        amount: Some(2.0),
+        amount: Some(dec!(2.0)),
         disputed: false,
     };
 
@@ -317,8 +320,8 @@ fn test_withdrawal_resolve() {
     {
         let c = clients.first().unwrap();
 
-        assert_eq!(8.0, c.available_funds);
-        assert_eq!(0.0, c.held_funds);
+        assert_eq!(dec!(8.0), c.available_funds);
+        assert_eq!(dec!(0.0), c.held_funds);
         assert!(!c.transactions.get(1).unwrap().disputed);
     }
 
@@ -328,9 +331,9 @@ fn test_withdrawal_resolve() {
     {
         let c = clients.first().unwrap();
 
-        assert_eq!(6.0, c.available_funds);
-        assert_eq!(2.0, c.held_funds);
-        assert_eq!(8.0, c.total_funds);
+        assert_eq!(dec!(6.0), c.available_funds);
+        assert_eq!(dec!(2.0), c.held_funds);
+        assert_eq!(dec!(8.0), c.total_funds);
         assert!(c.transactions.get(1).unwrap().disputed);
     }
 
@@ -338,9 +341,9 @@ fn test_withdrawal_resolve() {
     resolve(&mut clients, &tx_resolve);
 
     let c = clients.first().unwrap();
-    assert_eq!(8.0, c.available_funds);
-    assert_eq!(0.0, c.held_funds);
-    assert_eq!(8.0, c.total_funds);
+    assert_eq!(dec!(8.0), c.available_funds);
+    assert_eq!(dec!(0.0), c.held_funds);
+    assert_eq!(dec!(8.0), c.total_funds);
 
     assert!(!c.transactions.get(1).unwrap().disputed);
     assert!(!c.locked)
@@ -353,7 +356,7 @@ fn test_withdrawal_chargeback() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -361,7 +364,7 @@ fn test_withdrawal_chargeback() {
         tx_type: "withdrawal".to_string(),
         client_id: 1,
         tx_id: 2,
-        amount: Some(2.0),
+        amount: Some(dec!(2.0)),
         disputed: false,
     };
 
@@ -392,8 +395,8 @@ fn test_withdrawal_chargeback() {
     {
         let c = clients.first().unwrap();
 
-        assert_eq!(8.0, c.available_funds);
-        assert_eq!(0.0, c.held_funds);
+        assert_eq!(dec!(8.0), c.available_funds);
+        assert_eq!(dec!(0.0), c.held_funds);
         assert!(!c.transactions.get(1).unwrap().disputed);
     }
 
@@ -404,8 +407,8 @@ fn test_withdrawal_chargeback() {
     chargeback(&mut clients, &tx_chargeback);
 
     let c = clients.first().unwrap();
-    assert_eq!(0.0, c.held_funds);
-    assert_eq!(10.0, c.total_funds);
+    assert_eq!(dec!(0.0), c.held_funds);
+    assert_eq!(dec!(10.0), c.total_funds);
     assert!(c.locked)
 }
 
@@ -416,7 +419,7 @@ fn test_deposit_chargeback() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -424,7 +427,7 @@ fn test_deposit_chargeback() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 2,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -447,7 +450,7 @@ fn test_deposit_chargeback() {
     deposit(&mut clients, &tx_d);
     deposit(&mut clients, &tx_dd);
 
-    assert_eq!(20.0, clients.first().unwrap().total_funds);
+    assert_eq!(dec!(20.0), clients.first().unwrap().total_funds);
 
     dispute(&mut clients, &tx_dispute);
     chargeback(&mut clients, &tx_chargeback);
@@ -456,15 +459,14 @@ fn test_deposit_chargeback() {
     {
         let c = clients.first().unwrap();
 
-        assert_eq!(10.0, c.total_funds);
+        assert_eq!(dec!(10.0), c.total_funds);
         assert!(c.locked)
     }
 
     //doing something with a locked account is not possible
     deposit(&mut clients, &tx_dd);
-    assert_eq!(10.0, clients.first().unwrap().total_funds)
+    assert_eq!(dec!(10.0), clients.first().unwrap().total_funds)
 }
-
 
 #[test]
 fn test_deposit_resolve() {
@@ -473,7 +475,7 @@ fn test_deposit_resolve() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 1,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -481,7 +483,7 @@ fn test_deposit_resolve() {
         tx_type: "deposit".to_string(),
         client_id: 1,
         tx_id: 2,
-        amount: Some(10.0),
+        amount: Some(dec!(10.0)),
         disputed: false,
     };
 
@@ -504,7 +506,7 @@ fn test_deposit_resolve() {
     deposit(&mut clients, &tx_d);
     deposit(&mut clients, &tx_dd);
 
-    assert_eq!(20.0, clients.first().unwrap().total_funds);
+    assert_eq!(dec!(20.0), clients.first().unwrap().total_funds);
 
     dispute(&mut clients, &tx_dispute);
     resolve(&mut clients, &tx_chargeback);
@@ -512,6 +514,6 @@ fn test_deposit_resolve() {
     assert_eq!(1, clients.len());
     let c = clients.first().unwrap();
 
-    assert_eq!(0.0, c.held_funds);
-    assert_eq!(20.0, c.total_funds);
+    assert_eq!(dec!(0.0), c.held_funds);
+    assert_eq!(dec!(20.0), c.total_funds);
 }
