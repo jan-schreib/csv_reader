@@ -329,7 +329,7 @@ mod tests {
         assert!(!c.transactions.get(1).unwrap().disputed);
         assert!(!c.locked)
     }
-    #[cfg(test)]
+
     #[test]
     fn test_withdrawal_chargeback() {
         let mut clients: Vec<Client> = Vec::new();
