@@ -6,6 +6,7 @@ mod client;
 mod transaction;
 
 // Read and parse the csv file. Returns an error if the file can not be read or if there is a parsing error.
+// Reads the whole file bevor returning transactions.
 fn read_input_file(path: &str) -> Result<Vec<Transaction>, Box<dyn Error>> {
     let mut txs = Vec::new();
 
@@ -22,7 +23,12 @@ fn read_input_file(path: &str) -> Result<Vec<Transaction>, Box<dyn Error>> {
     Ok(txs)
 }
 
-///
+// The application read, parse, process the input file that is given as command line argument
+// and write the result to stdout.
+// On command line errors the program will exit with exitcode 1.
+//
+// Command line example:
+// ./csv_read <input.csv>
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
 
