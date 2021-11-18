@@ -60,7 +60,10 @@ impl Transaction {
                 "dispute" => t.dispute(&mut clients),
                 "resolve" => t.resolve(&mut clients),
                 "chargeback" => t.chargeback(&mut clients),
-                _ => continue,
+                _ => {
+                    eprintln!("Invalid transaction: {:?}", t);
+                    continue;
+                }
             }
         }
 
